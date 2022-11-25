@@ -1,19 +1,20 @@
+#include <stdio.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <queue>
-#include <string>
+#include <string.h> 
 
 using namespace std;
 
 class GramNode{
             public:
                 string gram;
-                int count;
+                double frequency;
                 GramNode(string g){
                     gram = g;
-                    count = 0;
+                    frequency = 0.0;
                 }
         };
 
@@ -24,8 +25,8 @@ class GramsFrequencyMap{
             for(int i = 0; i < gram.size(); i++){
                 hash_index += gram[i];
             }
-
-            return hash_index % capacity;
+            hash_index = hash_index % capacity;
+            return hash_index;
         }
 
         int capacity;
@@ -43,56 +44,37 @@ class GramsFrequencyMap{
                 while(map[hash_code] != NULL){
                     hash_code++;
                     hash_code %= capacity;
+                    if(map[hash_code] != NULL){
+                        if(map[hash_code]->gram == gram){
+                            map[hash_code]->frequency++;
+                            return;
+                        }
+                    }
                 }
 
                 GramNode *node = new GramNode(gram);
 
+                if(capacity == size){
+                    expand_map();
+                }
+
                 map[hash_code] = node;
                 size++;
+                keys.push_back(hash_code);
             }
             cout << "INVALID MAP CODE" << endl;
         }
 
-        GramNode *get_gram_from_code(int code){
-            return map[code];
-        }
-
-        int get_gram(string gram){
-            int hash_code;
-            int counter = 0;
-
-            hash_code = hashCode(gram);
-
-            while(map[hash_code] != NULL){
-                if(counter++ > capacity){
-                    return -1;
-                }
-                if(gram == map[hash_code]->gram){
-                    map[hash_code]->count++;
-                    return hash_code;
-                }
-                hash_code++;
-                hash_code %= capacity;
-            }
-        }
-
-        void insert_gram(string gram){
-            int code = get_gram(gram);
-            if(code == -1){
-                add_gram(gram);
-            }
-            if(capacity == size){
-                expand_map();
-            }
-        }
-
         void expand_map(){
-
+            cout << "Greater size needed" << endl;
         }
 
         GramsFrequencyMap(int cap){
             capacity = cap;
             map = new GramNode*[capacity];
+            for (int i = 0; i < capacity; i++){
+			    map[i] = NULL;
+		    }
         }
 };
 
@@ -117,8 +99,8 @@ class CharacterMap{
             int hash_index = 0;
 
             hash_index += character;
-
-            return hash_index % capacity;
+            hash_index = hash_index % capacity;
+            return hash_index;
         }
 
     public:
@@ -164,23 +146,39 @@ class CharacterMap{
                 hash_code %= capacity;
             }
         }
-
-        void get_suggested_words(string root, string addition, CharacterMap *current_search){
+        void get_next_word(string input, string sug_word, CharacterMap *current_search){
+            int num_keys = current_search->keys.size();
+            //search utilized keys and find words that have associated grams matching input
+            for(int i = 0; i < num_keys; i++){
+                complete_word(input, sug_word, current_search->map[current_search->keys[i]]->value);
+                int num_keys_grams = current_search->grams->keys.size();
+                sug_word = sug_word + current_search->map[current_search->keys[i]]->key;
+                for(int j = 0; j < num_keys_grams; j++){
+                    if(current_search->grams->map[current_search->grams->keys[j]]->gram == input){
+                        //order by frequency
+                        cout << sug_word << endl;
+                    }
+                }
+            }
+        }
+        void complete_word(string root, string addition, CharacterMap *current_search){
             int num_keys = current_search->keys.size();
             //search utilized keys
             for(int i = 0; i < num_keys; i++){
                 addition = addition + current_search->map[current_search->keys[i]]->key;
                 cout << i << " " << current_search->map[current_search->keys[i]]->key << " " << root << " " << addition << endl;
-                get_suggested_words(root, addition, current_search->map[current_search->keys[i]]->value);
+                complete_word(root, addition, current_search->map[current_search->keys[i]]->value);
                 addition = "";
             }
             if(current_search->frequency > 0.0){
+                //order by frequency
                 cout << root + addition << endl;
             }
         }
     
     CharacterMap(int n){
         capacity = n;
+        grams = NULL;
 		map = new CharacterNode*[capacity];
         size = 0;
         frequency = 0.0;
@@ -221,14 +219,18 @@ class InputPrediction{
                 }
             }
             
-            //insert gram and increment count
+            //add gram and increment frequency
+            if(ptr->grams == NULL){
+                ptr->grams = new GramsFrequencyMap(5);
+            }
             GramsFrequencyMap *grams = ptr->grams;
-            grams->insert_gram(gram_string);
+            grams->add_gram(gram_string);
         }
 
         void stream_suggested_words(string input){
             string sug_word = "";
             CharacterMap *ptr = map;
+            
             int length = input.size();
             for(int i = 0; i < length; i++){
                 //traverse the trie based on the input
@@ -238,61 +240,64 @@ class InputPrediction{
                 }
                 sug_word += input[i];
             }
-            //find the words ordered by the highest frequency under this map
-            ptr->get_suggested_words(sug_word,"",ptr);
+            if(ptr->frequency > 0){
+                //find the next word ordered by preceeding ngrams of the highest frequency
+                sug_word = "";
+                ptr->get_next_word(input,sug_word,map);
+            }else{
+                //find the words ordered by the highest frequency under this map
+                ptr->complete_word(sug_word,"",ptr);
+            }
         }
 
     InputPrediction(){
-        map = new CharacterMap(50);
+        map = new CharacterMap(26);
     }
     ~InputPrediction(){
 
     }
 };
 
-double frequency;
-wchar_t split = ',';
-
 int main(){
     InputPrediction predictor = InputPrediction();
-    GramsFrequencyMap gram_freq_map = GramsFrequencyMap(10000);
-
-    string gram2;
-    string gram3;
-    string last_word;
-    string second_last_word;
+    string input_string;
+    string gram_entry;
+    string token;
+    string gram;
     string word;
+    char split = '.';
 
     int counter = 0;
 
     ifstream textfile;
 
-    textfile.open("");
-
-    //load grams frequency map and predictor
+    textfile.open("words.txt");
     if(textfile.is_open()){
         while(getline(textfile, word)){
             predictor.insert(word);
-            if(counter > 2){
-                predictor.insertGram(word,gram2);
-            }
-            if(counter > 3){
-                predictor.insertGram(word,gram3);
-            }else{
-                counter++;
-            }
-            
-            gram2 = word + " " + last_word;
-            gram3 = word + " " + last_word + " " + second_last_word;
         }
     }
     textfile.close();
 
-    predictor.insert("ampersand");
-    predictor.insert("acclaimed");
-    predictor.insert("accelerate");
-    predictor.insert("accent");
-    predictor.insert("actor");
-    predictor.insert("burger");
-    predictor.stream_suggested_words("ac");
+    textfile.open("grams.txt");
+    if(textfile.is_open()){
+        while(getline(textfile, gram_entry)){
+            stringstream s(gram_entry);
+
+            getline(s,token,'.');
+            gram = token;
+            getline(s,token,'.');
+            word = token;
+
+            predictor.insertGram(word, gram);
+        }
+    }
+    textfile.close();
+
+    cout << "==== Text Input Prediction ====" << endl;
+    cout << "Input a partially completed word or a series of words." << endl;
+    while(true){
+        cin >> input_string;
+        predictor.stream_suggested_words(input_string);
+    }
 }
