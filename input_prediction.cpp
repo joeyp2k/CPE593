@@ -33,19 +33,23 @@ class GramsFrequencyMap{
         int size;
 
     public:
-        GramNode **map;
+        vector<GramNode*> map;
         vector<int> keys;
         
         void add_gram(string gram){
             int hash_code;
+
+            if(capacity == size){
+                expand_map();
+            }
 
             hash_code = hashCode(gram);
             if(hash_code >= 0){
                 while(map[hash_code] != NULL){
                     hash_code++;
                     hash_code %= capacity;
-                    if(map[hash_code] != NULL){
-                        if(map[hash_code]->gram == gram){
+                    if(map[hash_code] != NULL && !gram.empty()){
+                        if(gram == map[hash_code]->gram){
                             map[hash_code]->frequency++;
                             return;
                         }
@@ -54,27 +58,36 @@ class GramsFrequencyMap{
 
                 GramNode *node = new GramNode(gram);
 
-                if(capacity == size){
-                    expand_map();
-                }
-
                 map[hash_code] = node;
                 size++;
                 keys.push_back(hash_code);
+            }else{
+                cout << "INVALID MAP CODE" << endl;
             }
-            cout << "INVALID MAP CODE" << endl;
         }
 
         void expand_map(){
             cout << "Greater size needed" << endl;
+            int prev_capacity = capacity;
+            capacity = capacity = capacity + 5;
+
+            vector<GramNode*> new_map(capacity);
+            for (int i = 0; i < prev_capacity; i++){
+                new_map[i] = map[i];
+            }
+            for (int i = prev_capacity; i < capacity; i++){
+                new_map[i] = NULL;
+            }
+            map = new_map;
         }
 
         GramsFrequencyMap(int cap){
             capacity = cap;
-            map = new GramNode*[capacity];
+            size = 0;
+            map = vector<GramNode*>(capacity);
             for (int i = 0; i < capacity; i++){
-			    map[i] = NULL;
-		    }
+                map[i] = NULL;
+            }
         }
 };
 
@@ -116,7 +129,7 @@ class CharacterMap{
                     hash_code++;
                     hash_code %= capacity;
                 }
-                CharacterMap *char_map = new CharacterMap(50);
+                CharacterMap *char_map = new CharacterMap(26);
 
                 CharacterNode *node = new CharacterNode(character,char_map);
 
@@ -124,9 +137,10 @@ class CharacterMap{
                 map[hash_code] = node;
                 size++;
                 return char_map;
+            }else{
+                cout << "INVALID MAP CODE" << endl;
+                return NULL;
             }
-            cout << "INVALID MAP CODE" << endl;
-            return NULL;
         }
 
         CharacterMap *get_character(char character){
@@ -146,33 +160,39 @@ class CharacterMap{
                 hash_code %= capacity;
             }
         }
+        
         void get_next_word(string input, string sug_word, CharacterMap *current_search){
             int num_keys = current_search->keys.size();
             //search utilized keys and find words that have associated grams matching input
             for(int i = 0; i < num_keys; i++){
-                complete_word(input, sug_word, current_search->map[current_search->keys[i]]->value);
-                int num_keys_grams = current_search->grams->keys.size();
-                sug_word = sug_word + current_search->map[current_search->keys[i]]->key;
-                for(int j = 0; j < num_keys_grams; j++){
-                    if(current_search->grams->map[current_search->grams->keys[j]]->gram == input){
-                        //order by frequency
-                        cout << sug_word << endl;
+                get_next_word(input, sug_word, current_search->map[current_search->keys[i]]->value);
+                if(current_search->grams != NULL){
+                    int num_keys_grams = current_search->grams->keys.size();
+                    sug_word = sug_word + current_search->map[current_search->keys[i]]->key;
+                    for(int j = 0; j < num_keys_grams; j++){
+                        if(current_search->grams->map[current_search->grams->keys[j]]->gram == input){
+                            //order by frequency
+                            cout << sug_word << endl;
+                            sug_word = "";
+                        }
                     }
                 }
             }
         }
+
         void complete_word(string root, string addition, CharacterMap *current_search){
             int num_keys = current_search->keys.size();
             //search utilized keys
-            for(int i = 0; i < num_keys; i++){
-                addition = addition + current_search->map[current_search->keys[i]]->key;
-                cout << i << " " << current_search->map[current_search->keys[i]]->key << " " << root << " " << addition << endl;
-                complete_word(root, addition, current_search->map[current_search->keys[i]]->value);
-                addition = "";
-            }
             if(current_search->frequency > 0.0){
                 //order by frequency
                 cout << root + addition << endl;
+                root = root + addition;
+                addition = "";
+            }
+            for(int i = 0; i < num_keys; i++){
+                string new_addition = addition + current_search->map[current_search->keys[i]]->key;
+                cout << i << " " << current_search->map[current_search->keys[i]]->key << " " << root << " " << addition << endl;
+                complete_word(root, new_addition, current_search->map[current_search->keys[i]]->value);
             }
         }
     
@@ -230,23 +250,31 @@ class InputPrediction{
         void stream_suggested_words(string input){
             string sug_word = "";
             CharacterMap *ptr = map;
-            
+            CharacterMap *ptr_last;
+            string sug_word_last = "";
             int length = input.size();
             for(int i = 0; i < length; i++){
                 //traverse the trie based on the input
+                ptr_last = ptr;
                 ptr = ptr->get_character(input[i]);
                 if(ptr == NULL){
                     break;
                 }
+
                 sug_word += input[i];
             }
-            if(ptr->frequency > 0){
-                //find the next word ordered by preceeding ngrams of the highest frequency
-                sug_word = "";
-                ptr->get_next_word(input,sug_word,map);
+            if(length > 1){
+                 if(ptr_last->frequency > 0){
+                    //find the next word ordered by preceeding ngrams of the highest frequency
+                    sug_word = "";
+                    ptr_last->get_next_word(input,sug_word,map);
+                }else{
+                    //find the words ordered by the highest frequency under this map
+                    sug_word = sug_word.substr(0, sug_word.size() - 1);
+                    ptr_last->complete_word(sug_word,"",ptr_last);
+                }
             }else{
-                //find the words ordered by the highest frequency under this map
-                ptr->complete_word(sug_word,"",ptr);
+                 ptr->complete_word(sug_word,"",ptr);
             }
         }
 
@@ -288,7 +316,6 @@ int main(){
             gram = token;
             getline(s,token,'.');
             word = token;
-
             predictor.insertGram(word, gram);
         }
     }
