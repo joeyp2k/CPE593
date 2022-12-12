@@ -8,6 +8,19 @@
 
 using namespace std;
 
+class SugResult{
+    public:
+        string word;
+        double frequency;
+    SugResult(string w, double f){
+        frequency = f;
+        word = w;
+    }
+    ~SugResult(){
+
+    }
+};
+
 class GramNode{
             public:
                 string gram;
@@ -16,7 +29,10 @@ class GramNode{
                     gram = g;
                     frequency = 0.0;
                 }
-        };
+    ~GramNode(){
+
+    }
+};
 
 class GramsFrequencyMap{
     private:
@@ -33,7 +49,7 @@ class GramsFrequencyMap{
         int size;
 
     public:
-        vector<GramNode*> map;
+        vector<GramNode*> gram_map;
         vector<int> keys;
         
         void add_gram(string gram){
@@ -45,12 +61,12 @@ class GramsFrequencyMap{
 
             hash_code = hashCode(gram);
             if(hash_code >= 0){
-                while(map[hash_code] != NULL){
+                while(gram_map[hash_code] != NULL){
                     hash_code++;
                     hash_code %= capacity;
-                    if(map[hash_code] != NULL && !gram.empty()){
-                        if(gram == map[hash_code]->gram){
-                            map[hash_code]->frequency++;
+                    if(gram_map[hash_code] != NULL && !gram.empty()){
+                        if(gram == gram_map[hash_code]->gram){
+                            gram_map[hash_code]->frequency++;
                             return;
                         }
                     }
@@ -58,7 +74,7 @@ class GramsFrequencyMap{
 
                 GramNode *node = new GramNode(gram);
 
-                map[hash_code] = node;
+                gram_map[hash_code] = node;
                 size++;
                 keys.push_back(hash_code);
             }else{
@@ -67,27 +83,30 @@ class GramsFrequencyMap{
         }
 
         void expand_map(){
-            cout << "Greater size needed" << endl;
+            // cout << "Greater size needed" << endl;
             int prev_capacity = capacity;
             capacity = capacity = capacity + 5;
 
             vector<GramNode*> new_map(capacity);
             for (int i = 0; i < prev_capacity; i++){
-                new_map[i] = map[i];
+                new_map[i] = gram_map[i];
             }
             for (int i = prev_capacity; i < capacity; i++){
                 new_map[i] = NULL;
             }
-            map = new_map;
+            gram_map = new_map;
         }
 
         GramsFrequencyMap(int cap){
             capacity = cap;
             size = 0;
-            map = vector<GramNode*>(capacity);
+            gram_map = vector<GramNode*>(capacity);
             for (int i = 0; i < capacity; i++){
-                map[i] = NULL;
+                gram_map[i] = NULL;
             }
+        }
+        ~GramsFrequencyMap(){
+
         }
 };
 
@@ -130,9 +149,7 @@ class CharacterMap{
                     hash_code %= capacity;
                 }
                 CharacterMap *char_map = new CharacterMap(26);
-
                 CharacterNode *node = new CharacterNode(character,char_map);
-
                 keys.push_back(hash_code);
                 map[hash_code] = node;
                 size++;
@@ -160,39 +177,48 @@ class CharacterMap{
                 hash_code %= capacity;
             }
         }
-        
-        void get_next_word(string input, string sug_word, CharacterMap *current_search){
+
+        void get_next_word(string input, string sug_word, string sug_word_last, CharacterMap *current_search, vector<SugResult> &results){
             int num_keys = current_search->keys.size();
             //search utilized keys and find words that have associated grams matching input
-            for(int i = 0; i < num_keys; i++){
-                get_next_word(input, sug_word, current_search->map[current_search->keys[i]]->value);
+            if(current_search->frequency > 0.0){
                 if(current_search->grams != NULL){
                     int num_keys_grams = current_search->grams->keys.size();
-                    sug_word = sug_word + current_search->map[current_search->keys[i]]->key;
                     for(int j = 0; j < num_keys_grams; j++){
-                        if(current_search->grams->map[current_search->grams->keys[j]]->gram == input){
-                            //order by frequency
-                            cout << sug_word << endl;
-                            sug_word = "";
+                        if(current_search->grams->gram_map[current_search->grams->keys[j]]->gram == input){
+                            if(sug_word != sug_word_last){
+                                SugResult sug = SugResult(sug_word,current_search->frequency);
+                                results.push_back(sug);
+                                sug_word_last = sug_word;
+                                // cout << sug_word << endl;
+                            }
                         }
                     }
                 }
             }
+            for(int i = 0; i < num_keys; i++){
+                string next_sug_word = sug_word + current_search->map[current_search->keys[i]]->key;
+                get_next_word(input, next_sug_word, sug_word_last, current_search->map[current_search->keys[i]]->value, results);
+            }
         }
 
-        void complete_word(string root, string addition, CharacterMap *current_search){
+        void complete_word(string root, string addition, string sug_word_last, CharacterMap *current_search, vector<SugResult> &results){
             int num_keys = current_search->keys.size();
             //search utilized keys
             if(current_search->frequency > 0.0){
-                //order by frequency
-                cout << root + addition << endl;
                 root = root + addition;
-                addition = "";
+                if(root != sug_word_last){
+                    sug_word_last = root;
+                    SugResult sug = SugResult(root,current_search->frequency);
+                    results.push_back(sug);
+                    // cout << results.size();
+                    // cout << root << endl;
+                    addition = "";
+                }
             }
             for(int i = 0; i < num_keys; i++){
                 string new_addition = addition + current_search->map[current_search->keys[i]]->key;
-                cout << i << " " << current_search->map[current_search->keys[i]]->key << " " << root << " " << addition << endl;
-                complete_word(root, new_addition, current_search->map[current_search->keys[i]]->value);
+                complete_word(root, new_addition, sug_word_last, current_search->map[current_search->keys[i]]->value, results);
             }
         }
     
@@ -214,7 +240,36 @@ class CharacterMap{
 class InputPrediction{
     private:
         CharacterMap *map;
+        void quickSort(vector<SugResult> &results, int l, int r){
+            if(l >= r){
+                return;
+            }
+            int pivot_index = (l + r) / 2;
+            SugResult pivot = results[pivot_index];
 
+            int i = l;
+            int j = r;
+
+            while (i < j) {
+                while (results[i].frequency > pivot.frequency){
+                    i++;
+                }
+                while (results[j].frequency < pivot.frequency) {
+                    j--;
+                }
+                if (i <= j) {
+                    SugResult temp = results[i];
+                    results[i] = results[j];
+                    results[j] = temp;
+                    i++;
+                    j--;
+                }
+            }
+
+            quickSort(results, l, j);
+            quickSort(results, i, r);
+        }
+        
     public:
         void insert(string word){
             CharacterMap *ptr = map;
@@ -237,22 +292,20 @@ class InputPrediction{
                 }else{
                     ptr = ptr->add_character(word[i]);
                 }
+                if(ptr->grams == NULL){
+                    ptr->grams = new GramsFrequencyMap(5);
+                }
+                GramsFrequencyMap *grams = ptr->grams;
+                grams->add_gram(gram_string);
             }
-            
-            //add gram and increment frequency
-            if(ptr->grams == NULL){
-                ptr->grams = new GramsFrequencyMap(5);
-            }
-            GramsFrequencyMap *grams = ptr->grams;
-            grams->add_gram(gram_string);
         }
 
         void stream_suggested_words(string input){
             string sug_word = "";
             CharacterMap *ptr = map;
             CharacterMap *ptr_last;
-            string sug_word_last = "";
             int length = input.size();
+            vector<SugResult> results;
             for(int i = 0; i < length; i++){
                 //traverse the trie based on the input
                 ptr_last = ptr;
@@ -263,19 +316,31 @@ class InputPrediction{
 
                 sug_word += input[i];
             }
-            if(length > 1){
-                 if(ptr_last->frequency > 0){
+
+            if(length == 0){
+                cout << "Enter a two/three words or a prefix" << endl;
+                return;
+            }else{
+                if(ptr_last->frequency > 0){
                     //find the next word ordered by preceeding ngrams of the highest frequency
                     sug_word = "";
-                    ptr_last->get_next_word(input,sug_word,map);
-                }else{
-                    //find the words ordered by the highest frequency under this map
-                    sug_word = sug_word.substr(0, sug_word.size() - 1);
-                    ptr_last->complete_word(sug_word,"",ptr_last);
+                    ptr_last->get_next_word(input,sug_word,"",map,results);
+                }else if(ptr != NULL){
+                    ptr->complete_word(sug_word,"","",ptr,results);
                 }
-            }else{
-                 ptr->complete_word(sug_word,"",ptr);
             }
+            
+            int size = results.size();
+            int output_len = 5;
+            quickSort(results,0,size);
+            if(size < 5){
+                output_len = size;
+            }
+            cout << "RESULTS: " << size << endl;
+            for(int i = 0; i < output_len; i++){
+                cout << results[i].word << " | f: " << results[i].frequency << endl;
+            }
+            results.clear();
         }
 
     InputPrediction(){
@@ -322,9 +387,11 @@ int main(){
     textfile.close();
 
     cout << "==== Text Input Prediction ====" << endl;
-    cout << "Input a partially completed word or a series of words." << endl;
+    cout << "Input a word prefix or a series of 2-3 words." << endl;
+    predictor.stream_suggested_words("ee");
     while(true){
-        cin >> input_string;
+        getline(cin, input_string);
         predictor.stream_suggested_words(input_string);
+        cout << endl;
     }
 }
