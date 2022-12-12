@@ -388,7 +388,6 @@ int main(){
 
     cout << "==== Text Input Prediction ====" << endl;
     cout << "Input a word prefix or a series of 2-3 words." << endl;
-    predictor.stream_suggested_words("ee");
     while(true){
         getline(cin, input_string);
         predictor.stream_suggested_words(input_string);
