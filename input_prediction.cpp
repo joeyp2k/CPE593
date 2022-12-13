@@ -5,6 +5,7 @@
 #include <vector>
 #include <queue>
 #include <string.h> 
+#include <algorithm>
 
 using namespace std;
 
@@ -17,7 +18,7 @@ class SugResult{
         word = w;
     }
     ~SugResult(){
-
+        
     }
 };
 
@@ -190,7 +191,6 @@ class CharacterMap{
                                 SugResult sug = SugResult(sug_word,current_search->frequency);
                                 results.push_back(sug);
                                 sug_word_last = sug_word;
-                                // cout << sug_word << endl;
                             }
                         }
                     }
@@ -211,8 +211,6 @@ class CharacterMap{
                     sug_word_last = root;
                     SugResult sug = SugResult(root,current_search->frequency);
                     results.push_back(sug);
-                    // cout << results.size();
-                    // cout << root << endl;
                     addition = "";
                 }
             }
@@ -240,6 +238,7 @@ class CharacterMap{
 class InputPrediction{
     private:
         CharacterMap *map;
+    
         void quickSort(vector<SugResult> &results, int l, int r){
             if(l >= r){
                 return;
@@ -302,10 +301,11 @@ class InputPrediction{
 
         void stream_suggested_words(string input){
             string sug_word = "";
+            vector<SugResult> results;
             CharacterMap *ptr = map;
             CharacterMap *ptr_last;
             int length = input.size();
-            vector<SugResult> results;
+
             for(int i = 0; i < length; i++){
                 //traverse the trie based on the input
                 ptr_last = ptr;
@@ -332,15 +332,21 @@ class InputPrediction{
             
             int size = results.size();
             int output_len = 5;
-            quickSort(results,0,size);
+            if(size > 1){
+                quickSort(results,0,size - 1);
+            }
+
             if(size < 5){
                 output_len = size;
             }
-            cout << "RESULTS: " << size << endl;
-            for(int i = 0; i < output_len; i++){
-                cout << results[i].word << " | f: " << results[i].frequency << endl;
+            if(size > 0){
+                cout << "TOP RESULTS FROM " << size << " WORDS FOUND" << endl;
+                for(int i = 0; i < output_len; i++){
+                    cout << results[i].word << " | f: " << results[i].frequency << endl;
+                }
+            }else{
+                cout << "NO RESULTS FOUND" << endl;
             }
-            results.clear();
         }
 
     InputPrediction(){
@@ -388,6 +394,8 @@ int main(){
 
     cout << "==== Text Input Prediction ====" << endl;
     cout << "Input a word prefix or a series of 2-3 words." << endl;
+    // predictor.stream_suggested_words("a");
+    // predictor.stream_suggested_words("r");
     while(true){
         getline(cin, input_string);
         predictor.stream_suggested_words(input_string);
