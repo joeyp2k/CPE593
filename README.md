@@ -5,22 +5,20 @@ This repository contains a C++ implementation of a text input prediction tool mu
 
 The classes are as follows:
 
-## SugResult:
+### SugResult:
 This class contains a suggested word and its frequency of usage.
 
-## GramNode:
+### GramNode:
 This class contains an n-gram and its frequency of usage.
 
-## GramsFrequencyMap:
+### GramsFrequencyMap:
 This class is a hashmap that stores n-grams and their frequencies of usage. It has four members: capacity, which stores the capacity of the hashmap, size, which stores the current size of the hashmap, gram_map, which is a vector that stores the n-grams and their frequencies, and keys, a vector that contains any used hashcodes.
 
-## CharacterMap:
+### CharacterMap:
 This class contains the root node of the trie that stores words and their frequencies of usage. It has five members: capacity, which stores the capacity of the hashmap, size, which stores the current size of the hashmap, map, which is the array that stores the pointers to the nodes, grams, which is an instance of the GramsFrequencyMap class that stores the n-grams for the words stored in the trie, and keys, a vector that contains any used hashcodes.
 
-## InputPrediction:
+### InputPrediction:
 This class is the main class that implements the word suggestion functionality.
-
-The quickSort function at the end of the program is a quicksort implementation that can be used to sort the words retreived in ascending order of frequency. This allows the program to present the most frequently used words that could follow a given 2 or 3 word gram or complete a given prefix.
 
 ## Examples of word completion
 ![word_completion](https://user-images.githubusercontent.com/65480784/207206644-1555e45a-3933-40af-8e11-89cdf38e026d.PNG)
